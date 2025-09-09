@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hiragana Quiz – Neon Light</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>Hiragana Quiz <span class="neon">Neon Light</span></h1>
+    <p class="lead">Luyện thuộc 46 chữ Hiragana bằng câu hỏi <b>ngẫu nhiên</b>. Chọn chế độ, số câu, kiểu làm bài, thời gian → tạo đề.</p>
+
+    <!-- Controls -->
+    <div class="panel grid cols-3" id="controls">
+      <div>
+        <label for="mode">Chế độ</label>
+        <select id="mode">
+          <option value="h2r">Hiragana → Romaji</option>
+          <option value="r2h">Romaji → Hiragana</option>
+          <option value="mix" selected>Mixed (trộn 2 chiều)</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="qcount">Số câu</label>
+        <select id="qcount">
+          <option>20</option>
+          <option selected>25</option>
+          <option>30</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="qtype">Kiểu làm bài</label>
+        <select id="qtype">
+          <option value="mc" selected>Trắc nghiệm (4 đáp án)</option>
+          <option value="fill">Điền (tự gõ)</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="seed">Hạt giống (tùy chọn – để tái lập đề)</label>
+        <input id="seed" type="number" placeholder="VD: 12345" />
+      </div>
+
+      <div>
+        <label for="includeWo">Bao gồm を (wo – đọc “o”)?</label>
+        <select id="includeWo">
+          <option value="yes" selected>Có</option>
+          <option value="no">Không</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="timeLimit">Thời gian (đồng hồ)</label>
+        <select id="timeLimit">
+          <option value="0" selected>Không giới hạn</option>
+          <option value="300">5 phút</option>
+          <option value="600">10 phút</option>
+          <option value="900">15 phút</option>
+        </select>
+      </div>
+
+      <div class="align-end">
+        <button class="btn" id="gen">Tạo đề ngẫu nhiên</button>
+      </div>
+    </div>
+
+    <!-- Progress + Timer -->
+    <div class="panel soft" id="metaBar" style="display:none">
+      <div class="meta-row">
+        <div class="meta-left">
+          <div class="progress-wrap">
+            <div class="progress-label">
+              <span>Tiến độ</span>
+              <span id="progressText">0/0</span>
+            </div>
+            <div class="progress">
+              <div class="progress-bar" id="progressBar" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="meta-right">
+          <div class="timer">
+            <span class="timer-label">Thời gian còn lại</span>
+            <span class="timer-value" id="timer">--:--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions (trên cùng) -->
+    <div class="toolbar" id="actions" style="display:none">
+      <button class="btn ghost" id="revealAll">Hiện đáp án toàn bài</button>
+      <button class="btn ghost" id="reset">Tạo đề mới</button>
+      <span class="badge">Điểm: <span id="score" class="score">0</span></span>
+
+      <!-- Nút sau khi chấm -->
+      <button class="btn ghost" id="retryWrong" style="display:none">Làm lại câu sai</button>
+      <button class="btn ghost" id="exportResult" style="display:none">Xuất kết quả</button>
+    </div>
+
+    <!-- Quiz container -->
+    <div id="quiz" class="grid" style="margin-top:16px;gap:12px"></div>
+
+    <!-- Nút chấm điểm ở CUỐI bài -->
+    <div style="margin-top:20px;text-align:center;display:none" id="checkWrap">
+      <button class="btn" id="check">Chấm điểm</button>
+    </div>
+
+    <!-- Kết quả -->
+    <div id="result" class="panel result" style="display:none;margin-top:12px"></div>
+
+    <div class="footer">Mẹo: Đọc to chữ hỏi trước rồi mới chọn/điền đáp án để tăng trí nhớ dài hạn.</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
