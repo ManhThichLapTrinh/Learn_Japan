@@ -8,8 +8,33 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Hiragana Quiz <span class="neon">Neon Light</span></h1>
-    <p class="lead">Luyện thuộc 46 chữ Hiragana bằng câu hỏi <b>ngẫu nhiên</b>. Chọn chế độ, số câu, kiểu làm bài, thời gian → tạo đề.</p>
+    <h1>Hiragana Quiz <span class="neon">Demnka</span></h1>
+    <p class="lead">Luyện 46 chữ Hiragana bằng câu hỏi <b>ngẫu nhiên</b>. Chọn chế độ, số câu, kiểu làm bài, thời gian → tạo đề.</p>
+
+    <!-- Sticky (chỉ tiến độ + đồng hồ, LUÔN hiển thị) -->
+    <div id="stickyBar" class="sticky">
+      <div class="panel soft" id="metaBar" style="display:none">
+        <div class="meta-row">
+          <div class="meta-left">
+            <div class="progress-wrap">
+              <div class="progress-label">
+                <span>Tiến độ</span>
+                <span id="progressText">0/0</span>
+              </div>
+              <div class="progress">
+                <div class="progress-bar" id="progressBar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="meta-right">
+            <div class="timer">
+              <span class="timer-label">Thời gian còn lại</span>
+              <span class="timer-value" id="timer">--:--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Controls -->
     <div class="panel grid cols-3" id="controls">
@@ -67,36 +92,11 @@
       </div>
     </div>
 
-    <!-- Progress + Timer -->
-    <div class="panel soft" id="metaBar" style="display:none">
-      <div class="meta-row">
-        <div class="meta-left">
-          <div class="progress-wrap">
-            <div class="progress-label">
-              <span>Tiến độ</span>
-              <span id="progressText">0/0</span>
-            </div>
-            <div class="progress">
-              <div class="progress-bar" id="progressBar" style="width:0%"></div>
-            </div>
-          </div>
-        </div>
-        <div class="meta-right">
-          <div class="timer">
-            <span class="timer-label">Thời gian còn lại</span>
-            <span class="timer-value" id="timer">--:--</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Actions (trên cùng) -->
+    <!-- Actions -->
     <div class="toolbar" id="actions" style="display:none">
       <button class="btn ghost" id="revealAll">Hiện đáp án toàn bài</button>
       <button class="btn ghost" id="reset">Tạo đề mới</button>
       <span class="badge">Điểm: <span id="score" class="score">0</span></span>
-
-      <!-- Nút sau khi chấm -->
       <button class="btn ghost" id="retryWrong" style="display:none">Làm lại câu sai</button>
       <button class="btn ghost" id="exportResult" style="display:none">Xuất kết quả</button>
     </div>

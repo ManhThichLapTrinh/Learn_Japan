@@ -9,8 +9,7 @@ const KANA = [
   ["ま","ma"],["み","mi"],["む","mu"],["め","me"],["も","mo"],
   ["や","ya"],["ゆ","yu"],["よ","yo"],
   ["ら","ra"],["り","ri"],["る","ru"],["れ","re"],["ろ","ro"],
-  ["わ","wa"],["を","wo"], // đọc “o” khi làm trợ từ
-  ["ん","n"]
+  ["わ","wa"],["を","wo"],["ん","n"]
 ];
 
 // ===== Helpers & State =====
@@ -18,20 +17,18 @@ const $ = (s, r=document) => r.querySelector(s);
 const quizEl = $("#quiz");
 const scoreEl = $("#score");
 const actions = $("#actions");
-const genBtn = $("#gen");
-const revealBtn = $("#revealAll");
-const resetBtn = $("#reset");
-const retryBtn = $("#retryWrong");
-const exportBtn = $("#exportResult");
 const resultBox = $("#result");
 const checkWrap = $("#checkWrap");
 const checkBtn = $("#check");
+const retryBtn = $("#retryWrong");
+const exportBtn = $("#exportResult");
 
-const metaBar = $("#metaBar");
 const progressBar = $("#progressBar");
 const progressText = $("#progressText");
 const timerEl = $("#timer");
+const metaBar = $("#metaBar");
 
+// state
 const QuizState = {
   seed: null,
   startTime: null,
@@ -41,13 +38,12 @@ const QuizState = {
   answered: 0,
   total: 0,
   timerSec: 0,
-  tick: null,      // setInterval id
-  locked: false,   // khoá khi hết giờ
+  tick: null,
+  locked: false,
   lastExport: null
 };
 
 function seededRandom(seed){
-  // Mulberry32
   let t = seed >>> 0;
   return function(){
     t += 0x6D2B79F5;
@@ -64,12 +60,8 @@ function shuffle(arr, rng=Math.random){
   }
   return a;
 }
-function pickN(arr, n, rng=Math.random){
-  return shuffle(arr, rng).slice(0,n);
-}
-function makeBank(includeWo=true){
-  return KANA.filter(([k,r]) => includeWo ? true : r!=="wo");
-}
+function pickN(arr, n, rng=Math.random){ return shuffle(arr, rng).slice(0,n); }
+function makeBank(includeWo=true){ return KANA.filter(([k,r]) => includeWo ? true : r!=="wo"); }
 function normalize(s){ return String(s||"").trim().toLowerCase(); }
 function msToClock(ms){
   const sec = Math.max(0, Math.round(ms/1000));
@@ -110,15 +102,11 @@ function countAnswered(){
 function startTimer(seconds){
   stopTimer();
   QuizState.timerSec = seconds;
-  if(seconds <= 0){
-    timerEl.textContent = "--:--";
-    return;
-  }
+  if(seconds <= 0){ timerEl.textContent = "--:--"; return; }
   timerEl.textContent = secToClock(QuizState.timerSec);
   QuizState.tick = setInterval(()=>{
     if(QuizState.timerSec <= 0){
       stopTimer();
-      // Hết giờ → tự chấm và khoá bài
       if(!QuizState.locked){
         QuizState.locked = true;
         lockQuizUI(true);
@@ -131,12 +119,7 @@ function startTimer(seconds){
     timerEl.textContent = secToClock(QuizState.timerSec);
   }, 1000);
 }
-function stopTimer(){
-  if(QuizState.tick){
-    clearInterval(QuizState.tick);
-    QuizState.tick = null;
-  }
-}
+function stopTimer(){ if(QuizState.tick){ clearInterval(QuizState.tick); QuizState.tick = null; } }
 function lockQuizUI(lock){
   const inputs = quizEl.querySelectorAll("input");
   inputs.forEach(i => i.disabled = lock);
@@ -145,11 +128,11 @@ function lockQuizUI(lock){
 
 // ===== Quiz Generation =====
 function generateQuiz(fromWrongList=null){
-  const mode = $("#mode").value;          // h2r | r2h | mix
+  const mode = $("#mode").value;
   const qcount = parseInt($("#qcount").value, 10);
-  const qtype = $("#qtype").value;        // mc | fill
+  const qtype = $("#qtype").value;
   const includeWo = $("#includeWo").value === "yes";
-  const timeLimit = parseInt($("#timeLimit").value, 10); // seconds
+  const timeLimit = parseInt($("#timeLimit").value, 10);
   const seedVal = parseInt($("#seed").value || Date.now(), 10);
   const rng = seededRandom(seedVal);
 
@@ -160,7 +143,7 @@ function generateQuiz(fromWrongList=null){
 
   let picked;
   if(fromWrongList && fromWrongList.length){
-    picked = fromWrongList; // [{kana,roma,askH2R}] giữ nguyên chiều hỏi
+    picked = fromWrongList;
   } else {
     picked = pickN(bank, qcount, rng).map(([kana,roma])=>{
       const askH2R = mode==="h2r" ? true : mode==="r2h" ? false : (rng()<0.5);
@@ -207,7 +190,7 @@ function generateQuiz(fromWrongList=null){
       const choicesWrap = document.createElement("div");
       choicesWrap.className = "choices";
 
-      const pool = bank.map(p => askH2R ? p[1] : p[0]).filter(x => x!==correct);
+      const pool = QuizState.bank.map(p => askH2R ? p[1] : p[0]).filter(x => x!==correct);
       const rngLocal = seededRandom(QuizState.seed + idx);
       const distractors = pickN(pool, 3, rngLocal);
       const options = shuffle([correct, ...distractors], rngLocal);
@@ -217,7 +200,6 @@ function generateQuiz(fromWrongList=null){
         const row = document.createElement("label");
         row.className = "choice";
         row.innerHTML = `<input type="radio" name="q${idx}" value="${opt}" id="${id}"><span>${opt}</span>`;
-        // cập nhật tiến độ khi chọn
         row.querySelector("input").addEventListener("change", updateProgress);
         choicesWrap.appendChild(row);
       });
@@ -227,9 +209,7 @@ function generateQuiz(fromWrongList=null){
       input.className = "fill";
       input.setAttribute("autocomplete","off");
       input.setAttribute("placeholder", askH2R ? "Điền romaji (vd: shi)" : "Điền hiragana (vd: し)");
-      // cập nhật tiến độ khi gõ
       input.addEventListener("input", () => {
-        // throttling nhẹ bằng requestAnimationFrame
         if(!input._raf){
           input._raf = true;
           requestAnimationFrame(()=>{ input._raf=false; updateProgress(); });
@@ -257,7 +237,7 @@ function generateQuiz(fromWrongList=null){
         tip.textContent = "Đọc to chữ hỏi trước khi chọn/điền để nhớ tốt hơn.";
       }
     } else {
-      tip.textContent = "Gõ đúng chính tả .";
+      tip.textContent = "Gõ đúng chính tả kana (vd: し/ち/つ).";
     }
     card.appendChild(tip);
 
@@ -266,27 +246,19 @@ function generateQuiz(fromWrongList=null){
 
   QuizState.total = picked.length;
   updateProgress();
-
-  // Timer
   startTimer(timeLimit);
-
-  // mở đầu trang
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
 // ===== Check & Report =====
 function checkAnswers(auto=false){
-  if(QuizState.locked && !auto) return; // hết giờ thì đã tự chấm
+  if(QuizState.locked && !auto) return;
 
   const cards = [...document.querySelectorAll(".qcard")];
   if(!cards.length) return;
 
-  let correctCount = 0;
-  let wrongCount = 0;
-  let emptyCount = 0;
-  let bestStreak = 0;
-  let curStreak = 0;
-  let revealedCount = 0;
+  let correctCount = 0, wrongCount = 0, emptyCount = 0;
+  let bestStreak = 0, curStreak = 0, revealedCount = 0;
 
   const rowsForExport = [];
 
@@ -310,10 +282,7 @@ function checkAnswers(auto=false){
     if(revealed) revealedCount++;
 
     let isRight = normalize(userAns) === normalize(correct);
-    if(!userAns) {
-      emptyCount++;
-      isRight = false;
-    }
+    if(!userAns){ emptyCount++; isRight = false; }
 
     if(isRight){
       card.classList.remove("wrong");
@@ -337,7 +306,6 @@ function checkAnswers(auto=false){
     });
   });
 
-  // thời gian
   if(!QuizState.endTime) QuizState.endTime = Date.now();
   stopTimer();
   QuizState.locked = true;
@@ -381,25 +349,21 @@ function checkAnswers(auto=false){
     rows: rowsForExport
   };
 
-  // cuộn xuống kết quả
   resultBox.scrollIntoView({behavior:"smooth", block:"center"});
 }
 
-function revealAll(){
-  document.querySelectorAll(".qcard details").forEach(d => d.open = true);
-}
+function revealAll(){ document.querySelectorAll(".qcard details").forEach(d => d.open = true); }
 
 // ===== Retry wrong only =====
 function retryWrong(){
   const wrongCards = [...document.querySelectorAll(".qcard.wrong, .qcard:not(.correct):not(.wrong)")];
-  if(!wrongCards.length){ return; }
+  if(!wrongCards.length) return;
 
   const wrongItems = wrongCards.map(card => {
     const ask = card.dataset.ask === "h2r";
     return { kana: card.dataset.kana, roma: card.dataset.roma, askH2R: ask };
   });
 
-  // mở khoá trước khi tạo đề mới
   QuizState.locked = false;
   lockQuizUI(false);
   generateQuiz(wrongItems);
@@ -453,6 +417,6 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#retryWrong").addEventListener("click", retryWrong);
   $("#exportResult").addEventListener("click", exportResult);
 
-  // tạo đề mặc định
+  // đề mặc định
   generateQuiz();
 });
