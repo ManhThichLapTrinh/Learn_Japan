@@ -33,7 +33,7 @@ const QuizState = {
   seed: null,
   startTime: null,
   endTime: null,
-  items: [],       // [{kana, roma, askH2R}]
+  items: [],       // [{kanaSeq, romaSeq, askH2R}]
   bank: [],
   answered: 0,
   total: 0,
@@ -43,6 +43,7 @@ const QuizState = {
   lastExport: null
 };
 
+// ===== Random utils =====
 function seededRandom(seed){
   let t = seed >>> 0;
   return function(){
@@ -61,6 +62,8 @@ function shuffle(arr, rng=Math.random){
   return a;
 }
 function pickN(arr, n, rng=Math.random){ return shuffle(arr, rng).slice(0,n); }
+
+// ===== Core helpers =====
 function makeBank(includeWo=true){ return KANA.filter(([k,r]) => includeWo ? true : r!=="wo"); }
 function normalize(s){ return String(s||"").trim().toLowerCase(); }
 function msToClock(ms){
@@ -73,6 +76,44 @@ function secToClock(sec){
   const m = Math.floor(sec/60);
   const s = sec%60;
   return `${m}:${String(s).padStart(2,"0")}`;
+}
+function toRomaji(kanaSeq){
+  // kanaSeq: e.g. "から" -> "kara"
+  const map = Object.fromEntries(KANA);
+  // reverse map: kana -> romaji
+  // KANA is [kana, romaji], so mapKanaRomaji[kana] = romaji
+  let out = "";
+  for(const ch of kanaSeq){ out += map[ch] || ch; }
+  return out;
+}
+function toHiragana(romajiSeq){
+  // romajiSeq here luôn là chuỗi các âm cơ bản đã chuẩn (ka/shi/tsu...) khi mình ghép từ bank
+  // ta sẽ convert bằng cách cắt theo từ điển romaji->kana đơn giản
+  const mapR2K = Object.fromEntries(KANA.map(([k,r])=>[r,k]));
+  let out = "";
+  // greedy match các âm dài nhất trước (3 ký tự: chi, shi, tsu / 2 ký tự / 1 ký tự)
+  let i = 0;
+  const s = romajiSeq.toLowerCase();
+  while(i < s.length){
+    let seg = null;
+    if(i+3 <= s.length && mapR2K[s.slice(i,i+3)]) { seg = s.slice(i,i+3); i+=3; }
+    else if(i+2 <= s.length && mapR2K[s.slice(i,i+2)]) { seg = s.slice(i,i+2); i+=2; }
+    else if(mapR2K[s[i]]) { seg = s[i]; i+=1; }
+    else { // ký tự lạ: đưa thẳng
+      out += s[i];
+      i+=1;
+      continue;
+    }
+    out += mapR2K[seg];
+  }
+  return out;
+}
+function genSeq(bank, len, rng){
+  // trả về {kanaSeq, romaSeq} với len ký tự (từ bank)
+  const picks = pickN(bank, len, rng);
+  const kanaSeq = picks.map(p=>p[0]).join("");
+  const romaSeq = picks.map(p=>p[1]).join("");
+  return {kanaSeq, romaSeq};
 }
 
 // ===== Progress =====
@@ -127,12 +168,21 @@ function lockQuizUI(lock){
 }
 
 // ===== Quiz Generation =====
+function parseSeqLen(val, rng){
+  if(val === "1-3"){
+    const pool = [1,2,3];
+    return pool[Math.floor(rng()*pool.length)];
+  }
+  return Math.max(1, Math.min(4, parseInt(val,10)||1));
+}
+
 function generateQuiz(fromWrongList=null){
-  const mode = $("#mode").value;
+  const mode = $("#mode").value;                 // h2r | r2h | mix
   const qcount = parseInt($("#qcount").value, 10);
-  const qtype = $("#qtype").value;
+  const qtype = $("#qtype").value;               // mc | fill
   const includeWo = $("#includeWo").value === "yes";
   const timeLimit = parseInt($("#timeLimit").value, 10);
+  const seqLenVal = $("#seqLen").value;          // "1","2","3","4","1-3"
   const seedVal = parseInt($("#seed").value || Date.now(), 10);
   const rng = seededRandom(seedVal);
 
@@ -143,11 +193,14 @@ function generateQuiz(fromWrongList=null){
 
   let picked;
   if(fromWrongList && fromWrongList.length){
+    // đã là object sẵn {kanaSeq, romaSeq, askH2R}
     picked = fromWrongList;
   } else {
-    picked = pickN(bank, qcount, rng).map(([kana,roma])=>{
+    picked = Array.from({length:qcount}).map((_,i)=>{
+      const len = parseSeqLen(seqLenVal, rng);
+      const {kanaSeq, romaSeq} = genSeq(bank, len, rng);
       const askH2R = mode==="h2r" ? true : mode==="r2h" ? false : (rng()<0.5);
-      return {kana, roma, askH2R};
+      return { kanaSeq, romaSeq, askH2R };
     });
   }
 
@@ -169,15 +222,15 @@ function generateQuiz(fromWrongList=null){
 
   // Render questions
   picked.forEach((item, idx) => {
-    const {kana, roma, askH2R} = item;
-    const question = askH2R ? kana : roma;
-    const correct = askH2R ? roma : kana;
+    const {kanaSeq, romaSeq, askH2R} = item;
+    const question = askH2R ? kanaSeq : romaSeq;
+    const correct = askH2R ? romaSeq : kanaSeq;
 
     const card = document.createElement("div");
     card.className = "qcard";
     card.dataset.correct = correct;
-    card.dataset.kana = kana;
-    card.dataset.roma = roma;
+    card.dataset.kanaSeq = kanaSeq;
+    card.dataset.romaSeq = romaSeq;
     card.dataset.ask = askH2R ? "h2r" : "r2h";
 
     const head = document.createElement("div");
@@ -190,12 +243,26 @@ function generateQuiz(fromWrongList=null){
       const choicesWrap = document.createElement("div");
       choicesWrap.className = "choices";
 
-      const pool = QuizState.bank.map(p => askH2R ? p[1] : p[0]).filter(x => x!==correct);
-      const rngLocal = seededRandom(QuizState.seed + idx);
-      const distractors = pickN(pool, 3, rngLocal);
-      const options = shuffle([correct, ...distractors], rngLocal);
+      const needH2R = askH2R; // nếu hỏi hira→roma, đáp án là romaji; r2h thì đáp án là kana
+      const len = kanaSeq.length; // độ dài chuỗi theo số ký tự kana (romaji có độ dài khác, nhưng distractors sẽ sinh theo cùng số âm)
 
-      options.forEach((opt, oi) => {
+      const rngLocal = seededRandom(QuizState.seed + idx * 97 + 13);
+      const optSet = new Set([correct]);
+      const options = [correct];
+
+      let guard = 0;
+      while(options.length < 4 && guard < 200){
+        guard++;
+        const l = kanaSeq.length; // sinh distractor với số âm giống nhau
+        const {kanaSeq: k2, romaSeq: r2} = genSeq(QuizState.bank, l, rngLocal);
+        const cand = needH2R ? r2 : k2;
+        if(!optSet.has(cand)){
+          options.push(cand);
+          optSet.add(cand);
+        }
+      }
+
+      shuffle(options, rngLocal).forEach((opt, oi) => {
         const id = `q${idx}_o${oi}`;
         const row = document.createElement("label");
         row.className = "choice";
@@ -203,12 +270,13 @@ function generateQuiz(fromWrongList=null){
         row.querySelector("input").addEventListener("change", updateProgress);
         choicesWrap.appendChild(row);
       });
+
       card.appendChild(choicesWrap);
     } else {
       const input = document.createElement("input");
       input.className = "fill";
       input.setAttribute("autocomplete","off");
-      input.setAttribute("placeholder", askH2R ? "Điền romaji (vd: shi)" : "Điền hiragana (vd: し)");
+      input.setAttribute("placeholder", askH2R ? "Điền romaji (vd: shita)" : "Điền hiragana (vd: した)");
       input.addEventListener("input", () => {
         if(!input._raf){
           input._raf = true;
@@ -230,15 +298,9 @@ function generateQuiz(fromWrongList=null){
 
     const tip = document.createElement("div");
     tip.className = "explain";
-    if(askH2R){
-      if(["shi","chi","tsu","fu"].includes(roma)){
-        tip.textContent = "Mẹo: し=shi, ち=chi, つ=tsu, ふ=fu (rất dễ nhầm).";
-      } else {
-        tip.textContent = "Đọc to chữ hỏi trước khi chọn/điền để nhớ tốt hơn.";
-      }
-    } else {
-      tip.textContent = "Gõ đúng chính tả kana (vd: し/ち/つ).";
-    }
+    tip.textContent = askH2R
+      ? "Gợi ý: đọc liền mạch chuỗi kana rồi chuyển sang romaji."
+      : "Gợi ý: chuyển từng âm romaji sang kana, rồi ghép lại.";
     card.appendChild(tip);
 
     quizEl.appendChild(card);
@@ -246,7 +308,11 @@ function generateQuiz(fromWrongList=null){
 
   QuizState.total = picked.length;
   updateProgress();
+
+  // Timer
   startTimer(timeLimit);
+
+  // mở đầu trang
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
@@ -265,8 +331,8 @@ function checkAnswers(auto=false){
   cards.forEach((card, idx) => {
     const correct = card.dataset.correct;
     const ask = card.dataset.ask;
-    const kana = card.dataset.kana;
-    const roma = card.dataset.roma;
+    const kanaSeq = card.dataset.kanaSeq;
+    const romaSeq = card.dataset.romaSeq;
 
     const radios = card.querySelectorAll('input[type="radio"]');
     let userAns = "";
@@ -300,7 +366,7 @@ function checkAnswers(auto=false){
     rowsForExport.push({
       no: idx+1,
       mode: ask==="h2r" ? "Hira→Roma" : "Roma→Hira",
-      prompt: ask==="h2r" ? kana : roma,
+      prompt: ask==="h2r" ? kanaSeq : romaSeq,
       your: userAns || "(bỏ trống)",
       correct
     });
@@ -361,7 +427,11 @@ function retryWrong(){
 
   const wrongItems = wrongCards.map(card => {
     const ask = card.dataset.ask === "h2r";
-    return { kana: card.dataset.kana, roma: card.dataset.roma, askH2R: ask };
+    return {
+      kanaSeq: card.dataset.kanaSeq,
+      romaSeq: card.dataset.romaSeq,
+      askH2R: ask
+    };
   });
 
   QuizState.locked = false;
