@@ -77,7 +77,6 @@
     }
     return a;
   }
-  function pickN(arr, n, rng=Math.random){ return shuffle(arr, rng).slice(0,n); }
   function normalize(s){ return String(s||"").trim().toLowerCase(); }
   function msToClock(ms){
     const sec = Math.max(0, Math.round(ms/1000));

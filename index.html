@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Kana Quiz – Demnka</title>
+  <title>Kana Quiz – DemnKa</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="wrap">
-    <h1>Kana Quiz <span class="neon">Demnka</span></h1>
-    <p class="lead">Luyện bảng chữ cái Nhật: <b>Hiragana</b> & <b>(Updated V0.3)Katakana</b>.</p>
+    <h1>Kana Quiz <span class="neon">DemnKa</span></h1>
+    <p class="lead">Luyện bảng chữ cái Nhật: <b>Hiragana</b> & <b>(Updated v0.4)Katakana</b>.</b></p>
 
     <!-- Sticky (Tiến độ + Đồng hồ) -->
     <div id="stickyBar" class="sticky">
@@ -146,39 +146,43 @@
 
   <script src="app.js"></script>
 
-  <!-- Firebase Presence (CDN modules) -->
+  <!-- Firebase Presence (đếm số online, dùng Realtime Database) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, onValue, onDisconnect, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    import {
+      getDatabase, ref, onValue, onDisconnect, set, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // TODO: Dán cấu hình Firebase của bạn ở đây
+    // Cấu hình Firebase của bạn
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
+      apiKey: "AIzaSyBfS5Iv2DzOh6lvV1yQsF9G7rsLkSksyeQ",
+      authDomain: "learn-japan-7270d.firebaseapp.com",
+      databaseURL: "https://learn-japan-7270d-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "learn-japan-7270d",
+      storageBucket: "learn-japan-7270d.appspot.com",
+      messagingSenderId: "396837788671",
+      appId: "1:396837788671:web:75495079b66d9dfcada5ca",
+      measurementId: "G-B3XP64MWP7"
     };
 
+    // Khởi tạo
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
     // Tạo session cho mỗi tab
     const sessionId = `s_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}_${Date.now()}`;
-    const sessRef = ref(db, `presence/${sessionId}`);
+    const sessRef   = ref(db, `presence/${sessionId}`);
 
-    // Đăng ký hiện diện
+    // Ghi hiện diện
     await set(sessRef, {
-      ts: Date.now(),
+      ts: serverTimestamp(),
       ua: navigator.userAgent.slice(0, 120)
     });
 
     // Xoá khi tab đóng/mất kết nối
     onDisconnect(sessRef).remove();
 
-    // Đếm số phiên online
+    // Đếm online
     const presenceRoot = ref(db, "presence");
     const onlineCountEl = document.getElementById("onlineCount");
     onValue(presenceRoot, (snap) => {
