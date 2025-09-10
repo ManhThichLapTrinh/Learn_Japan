@@ -148,48 +148,59 @@
 
   <!-- Firebase Presence (đếm số online, dùng Realtime Database) -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getDatabase, ref, onValue, onDisconnect, set, serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, onValue, onDisconnect, set, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    // Cấu hình Firebase của bạn
-    const firebaseConfig = {
-      apiKey: "AIzaSyBfS5Iv2DzOh6lvV1yQsF9G7rsLkSksyeQ",
-      authDomain: "learn-japan-7270d.firebaseapp.com",
-      databaseURL: "https://learn-japan-7270d-default-rtdb.firebaseio.com",
-      projectId: "learn-japan-7270d",
-      storageBucket: "learn-japan-7270d.appspot.com",
-      messagingSenderId: "396837788671",
-      appId: "1:396837788671:web:75495079b66d9dfcada5ca",
-      measurementId: "G-B3XP64MWP7"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfS5Iv2DzOh6lvV1yQsF9G7rsLkSksyeQ",
+    authDomain: "learn-japan-7270d.firebaseapp.com",
+    databaseURL: "https://learn-japan-7270d-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "learn-japan-7270d",
+    storageBucket: "learn-japan-7270d.appspot.com",
+    messagingSenderId: "396837788671",
+    appId: "1:396837788671:web:75495079b66d9dfcada5ca",
+    measurementId: "G-B3XP64MWP7"
+  };
 
-    // Khởi tạo
-    const app = initializeApp(firebaseConfig);
-    const db  = getDatabase(app);
+  const app  = initializeApp(firebaseConfig);
+  const db   = getDatabase(app);
+  const auth = getAuth(app);
 
-    // Tạo session cho mỗi tab
+  const onlineCountEl = document.getElementById("onlineCount");
+  const presenceRoot  = ref(db, "presence");
+
+  // Đăng nhập ẩn danh (bật trong Console: Authentication → Sign-in method → Anonymous)
+  await signInAnonymously(auth).catch(e => console.error("Anon sign-in failed:", e));
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return;
+    const uid = user.uid;
+
+    // mỗi tab 1 session
     const sessionId = `s_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}_${Date.now()}`;
-    const sessRef   = ref(db, `presence/${sessionId}`);
+    const sessRef   = ref(db, `presence/${uid}/${sessionId}`);
 
-    // Ghi hiện diện
-    await set(sessRef, {
-      ts: serverTimestamp(),
-      ua: navigator.userAgent.slice(0, 120)
-    });
+    try {
+      await set(sessRef, { ts: serverTimestamp(), ua: navigator.userAgent.slice(0, 120) });
+      onDisconnect(sessRef).remove();
+    } catch (err) {
+      console.error("Presence set failed:", err);
+    }
+  });
 
-    // Xoá khi tab đóng/mất kết nối
-    onDisconnect(sessRef).remove();
+  // Đếm tổng số session dưới /presence/*/*
+  onValue(presenceRoot, (snap) => {
+    const val = snap.val() || {};
+    let count = 0;
+    for (const uid of Object.keys(val)) {
+      count += Object.keys(val[uid] || {}).length;
+    }
+    if (onlineCountEl) onlineCountEl.textContent = String(count);
+  });
+</script>
 
-    // Đếm online
-    const presenceRoot = ref(db, "presence");
-    const onlineCountEl = document.getElementById("onlineCount");
-    onValue(presenceRoot, (snap) => {
-      const val = snap.val() || {};
-      const count = Object.keys(val).length;
-      if (onlineCountEl) onlineCountEl.textContent = String(count);
-    });
-  </script>
 </body>
 </html>
