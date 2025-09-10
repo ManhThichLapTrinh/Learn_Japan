@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hiragana Quiz – Neon Light</title>
+  <title>Kana Quiz – Neon Light</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="wrap">
-    <h1>Hiragana Quiz <span class="neon">Demnka</span></h1>
-    <p class="lead">Luyện 46 chữ Hiragana với câu hỏi <b>ngẫu nhiên</b>. Chọn chế độ, số câu, kiểu làm bài, <b>độ dài chuỗi</b>, thời gian → tạo đề.</p>
+    <h1>Kana Quiz <span class="neon">Demnka</span></h1>
+    <p class="lead">Luyện bảng chữ cái Nhật: <b>Hiragana</b> & <b>(v0.3 updated)Katakana</b>.</p>
 
     <!-- Sticky (Tiến độ + Đồng hồ) -->
     <div id="stickyBar" class="sticky">
@@ -39,10 +39,19 @@
     <!-- Controls -->
     <div class="panel grid cols-3" id="controls">
       <div>
+        <label for="script">Bảng chữ</label>
+        <select id="script">
+          <option value="hira">Hiragana</option>
+          <option value="kata" selected>Katakana</option>
+          <option value="mix">Trộn (Hira + Kata)</option>
+        </select>
+      </div>
+
+      <div>
         <label for="mode">Chế độ</label>
         <select id="mode">
-          <option value="h2r">Hiragana → Romaji</option>
-          <option value="r2h">Romaji → Hiragana</option>
+          <option value="k2r">Kana → Romaji</option>
+          <option value="r2k">Romaji → Kana</option>
           <option value="mix" selected>Mixed (trộn 2 chiều)</option>
         </select>
       </div>
@@ -81,7 +90,7 @@
       </div>
 
       <div>
-        <label for="includeWo">Bao gồm を (wo – đọc “o”)?</label>
+        <label for="includeWo">Bao gồm を/ヲ (wo – đọc “o”)?</label>
         <select id="includeWo">
           <option value="yes" selected>Có</option>
           <option value="no">Không</option>
@@ -123,7 +132,13 @@
     <!-- Kết quả -->
     <div id="result" class="panel result" style="display:none;margin-top:12px"></div>
 
-    <div class="footer">Mẹo: Với chuỗi dài, đừng nhìn từng chữ rời — hãy đọc liền mạch (ví dụ "ka"+"ra" → "kara").</div>
+    <div class="footer">
+       <span>© <span id="year">
+       Mẹo: Khi học Katakana, hãy chú ý các chữ dễ lẫn (ソ/ン, シ/ツ, フ/ウ...). 
+      </span> · Tạo bởi <strong>TuanManh</strong></span>
+      </div>
+    
+
   </div>
 
   <script src="app.js"></script>

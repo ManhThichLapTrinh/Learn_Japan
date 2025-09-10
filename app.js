@@ -1,5 +1,5 @@
-// ===== Data: 46 Hiragana cơ bản =====
-const KANA = [
+// ======= Kana Data (46 cơ bản) =======
+const HIRA = [
   ["あ","a"],["い","i"],["う","u"],["え","e"],["お","o"],
   ["か","ka"],["き","ki"],["く","ku"],["け","ke"],["こ","ko"],
   ["さ","sa"],["し","shi"],["す","su"],["せ","se"],["そ","so"],
@@ -12,7 +12,20 @@ const KANA = [
   ["わ","wa"],["を","wo"],["ん","n"]
 ];
 
-// ===== Helpers & State =====
+const KATA = [
+  ["ア","a"],["イ","i"],["ウ","u"],["エ","e"],["オ","o"],
+  ["カ","ka"],["キ","ki"],["ク","ku"],["ケ","ke"],["コ","ko"],
+  ["サ","sa"],["シ","shi"],["ス","su"],["セ","se"],["ソ","so"],
+  ["タ","ta"],["チ","chi"],["ツ","tsu"],["テ","te"],["ト","to"],
+  ["ナ","na"],["ニ","ni"],["ヌ","nu"],["ネ","ne"],["ノ","no"],
+  ["ハ","ha"],["ヒ","hi"],["フ","fu"],["ヘ","he"],["ホ","ho"],
+  ["マ","ma"],["ミ","mi"],["ム","mu"],["メ","me"],["モ","mo"],
+  ["ヤ","ya"],["ユ","yu"],["ヨ","yo"],
+  ["ラ","ra"],["リ","ri"],["ル","ru"],["レ","re"],["ロ","ro"],
+  ["ワ","wa"],["ヲ","wo"],["ン","n"]
+];
+
+// ======= DOM & State =======
 const $ = (s, r=document) => r.querySelector(s);
 const quizEl = $("#quiz");
 const scoreEl = $("#score");
@@ -28,13 +41,11 @@ const progressText = $("#progressText");
 const timerEl = $("#timer");
 const metaBar = $("#metaBar");
 
-// state
 const QuizState = {
   seed: null,
   startTime: null,
   endTime: null,
-  items: [],       // [{kanaSeq, romaSeq, askH2R}]
-  bank: [],
+  items: [],       // [{kanaSeq, romaSeq, askK2R, script:'hira'|'kata'}]
   answered: 0,
   total: 0,
   timerSec: 0,
@@ -43,7 +54,7 @@ const QuizState = {
   lastExport: null
 };
 
-// ===== Random utils =====
+// ======= Utils =======
 function seededRandom(seed){
   let t = seed >>> 0;
   return function(){
@@ -62,9 +73,6 @@ function shuffle(arr, rng=Math.random){
   return a;
 }
 function pickN(arr, n, rng=Math.random){ return shuffle(arr, rng).slice(0,n); }
-
-// ===== Core helpers =====
-function makeBank(includeWo=true){ return KANA.filter(([k,r]) => includeWo ? true : r!=="wo"); }
 function normalize(s){ return String(s||"").trim().toLowerCase(); }
 function msToClock(ms){
   const sec = Math.max(0, Math.round(ms/1000));
@@ -77,46 +85,52 @@ function secToClock(sec){
   const s = sec%60;
   return `${m}:${String(s).padStart(2,"0")}`;
 }
-function toRomaji(kanaSeq){
-  // kanaSeq: e.g. "から" -> "kara"
-  const map = Object.fromEntries(KANA);
-  // reverse map: kana -> romaji
-  // KANA is [kana, romaji], so mapKanaRomaji[kana] = romaji
-  let out = "";
-  for(const ch of kanaSeq){ out += map[ch] || ch; }
-  return out;
-}
-function toHiragana(romajiSeq){
-  // romajiSeq here luôn là chuỗi các âm cơ bản đã chuẩn (ka/shi/tsu...) khi mình ghép từ bank
-  // ta sẽ convert bằng cách cắt theo từ điển romaji->kana đơn giản
-  const mapR2K = Object.fromEntries(KANA.map(([k,r])=>[r,k]));
-  let out = "";
-  // greedy match các âm dài nhất trước (3 ký tự: chi, shi, tsu / 2 ký tự / 1 ký tự)
-  let i = 0;
-  const s = romajiSeq.toLowerCase();
-  while(i < s.length){
-    let seg = null;
-    if(i+3 <= s.length && mapR2K[s.slice(i,i+3)]) { seg = s.slice(i,i+3); i+=3; }
-    else if(i+2 <= s.length && mapR2K[s.slice(i,i+2)]) { seg = s.slice(i,i+2); i+=2; }
-    else if(mapR2K[s[i]]) { seg = s[i]; i+=1; }
-    else { // ký tự lạ: đưa thẳng
-      out += s[i];
-      i+=1;
-      continue;
-    }
-    out += mapR2K[seg];
-  }
-  return out;
-}
-function genSeq(bank, len, rng){
-  // trả về {kanaSeq, romaSeq} với len ký tự (từ bank)
-  const picks = pickN(bank, len, rng);
-  const kanaSeq = picks.map(p=>p[0]).join("");
-  const romaSeq = picks.map(p=>p[1]).join("");
-  return {kanaSeq, romaSeq};
+
+// build maps romaji->kana for both scripts (1:1 âm cơ bản)
+const MAP_R2K_HIRA = Object.fromEntries(HIRA.map(([k,r])=>[r,k]));
+const MAP_R2K_KATA = Object.fromEntries(KATA.map(([k,r])=>[r,k]));
+
+// ======= Bank helpers =======
+function getBank(script, includeWo){
+  const withWo = includeWo === "yes";
+  const filt = pair => withWo ? true : pair[1] !== "wo";
+  if(script==="hira") return HIRA.filter(filt);
+  if(script==="kata") return KATA.filter(filt);
+  // mix: gộp
+  return [...HIRA.filter(filt), ...KATA.filter(filt)];
 }
 
-// ===== Progress =====
+function parseSeqLen(val, rng){
+  if(val === "1-3"){
+    const pool = [1,2,3];
+    return pool[Math.floor(rng()*pool.length)];
+  }
+  return Math.max(1, Math.min(4, parseInt(val,10)||1));
+}
+
+function genSeq(script, includeWo, len, rng){
+  // script: 'hira'|'kata'|'mix'
+  // Nếu 'mix': từng âm 50/50 Hira/Kata
+  const pickOne = (sc) => {
+    const bank = sc==='hira' ? getBank('hira', includeWo)
+      : sc==='kata' ? getBank('kata', includeWo)
+      : getBank('mix', includeWo);
+    return bank[Math.floor(rng()*bank.length)];
+  };
+
+  const kanaArr = [];
+  const romaArr = [];
+  for(let i=0;i<len;i++){
+    let sc = script;
+    if(script==='mix'){ sc = (rng()<0.5) ? 'hira' : 'kata'; }
+    const [kana, roma] = pickOne(sc);
+    kanaArr.push(kana);
+    romaArr.push(roma);
+  }
+  return { kanaSeq: kanaArr.join(''), romaSeq: romaArr.join('') };
+}
+
+// ======= Progress =======
 function updateProgress(){
   const total = QuizState.total;
   const answered = countAnswered();
@@ -139,7 +153,7 @@ function countAnswered(){
   return n;
 }
 
-// ===== Timer =====
+// ======= Timer =======
 function startTimer(seconds){
   stopTimer();
   QuizState.timerSec = seconds;
@@ -167,40 +181,30 @@ function lockQuizUI(lock){
   checkBtn.disabled = lock;
 }
 
-// ===== Quiz Generation =====
-function parseSeqLen(val, rng){
-  if(val === "1-3"){
-    const pool = [1,2,3];
-    return pool[Math.floor(rng()*pool.length)];
-  }
-  return Math.max(1, Math.min(4, parseInt(val,10)||1));
-}
-
+// ======= Quiz Generation =======
 function generateQuiz(fromWrongList=null){
-  const mode = $("#mode").value;                 // h2r | r2h | mix
+  const script = $("#script").value;             // hira | kata | mix
+  const mode = $("#mode").value;                 // k2r | r2k | mix
   const qcount = parseInt($("#qcount").value, 10);
   const qtype = $("#qtype").value;               // mc | fill
-  const includeWo = $("#includeWo").value === "yes";
+  const includeWo = $("#includeWo").value;
+  const seqLenVal = $("#seqLen").value;
   const timeLimit = parseInt($("#timeLimit").value, 10);
-  const seqLenVal = $("#seqLen").value;          // "1","2","3","4","1-3"
   const seedVal = parseInt($("#seed").value || Date.now(), 10);
   const rng = seededRandom(seedVal);
 
-  const bank = makeBank(includeWo);
-  QuizState.bank = bank;
   QuizState.seed = seedVal;
   QuizState.locked = false;
 
   let picked;
   if(fromWrongList && fromWrongList.length){
-    // đã là object sẵn {kanaSeq, romaSeq, askH2R}
-    picked = fromWrongList;
+    picked = fromWrongList; // đã là object sẵn
   } else {
     picked = Array.from({length:qcount}).map((_,i)=>{
       const len = parseSeqLen(seqLenVal, rng);
-      const {kanaSeq, romaSeq} = genSeq(bank, len, rng);
-      const askH2R = mode==="h2r" ? true : mode==="r2h" ? false : (rng()<0.5);
-      return { kanaSeq, romaSeq, askH2R };
+      const {kanaSeq, romaSeq} = genSeq(script, includeWo, len, rng);
+      const askK2R = mode==="k2r" ? true : mode==="r2k" ? false : (rng()<0.5);
+      return { kanaSeq, romaSeq, askK2R, script };
     });
   }
 
@@ -220,18 +224,18 @@ function generateQuiz(fromWrongList=null){
   progressBar.style.width = "0%";
   progressText.textContent = "0/0";
 
-  // Render questions
+  // Render
   picked.forEach((item, idx) => {
-    const {kanaSeq, romaSeq, askH2R} = item;
-    const question = askH2R ? kanaSeq : romaSeq;
-    const correct = askH2R ? romaSeq : kanaSeq;
+    const {kanaSeq, romaSeq, askK2R} = item;
+    const question = askK2R ? kanaSeq : romaSeq;
+    const correct = askK2R ? romaSeq : kanaSeq;
 
     const card = document.createElement("div");
     card.className = "qcard";
     card.dataset.correct = correct;
     card.dataset.kanaSeq = kanaSeq;
     card.dataset.romaSeq = romaSeq;
-    card.dataset.ask = askH2R ? "h2r" : "r2h";
+    card.dataset.ask = askK2R ? "k2r" : "r2k";
 
     const head = document.createElement("div");
     head.className = "qhead";
@@ -243,19 +247,18 @@ function generateQuiz(fromWrongList=null){
       const choicesWrap = document.createElement("div");
       choicesWrap.className = "choices";
 
-      const needH2R = askH2R; // nếu hỏi hira→roma, đáp án là romaji; r2h thì đáp án là kana
-      const len = kanaSeq.length; // độ dài chuỗi theo số ký tự kana (romaji có độ dài khác, nhưng distractors sẽ sinh theo cùng số âm)
+      const needK2R = askK2R; // nếu hỏi kana→romaji, đáp án là romaji; r2k thì đáp án là kana
+      const l = kanaSeq.length;
 
       const rngLocal = seededRandom(QuizState.seed + idx * 97 + 13);
       const optSet = new Set([correct]);
       const options = [correct];
 
       let guard = 0;
-      while(options.length < 4 && guard < 200){
+      while(options.length < 4 && guard < 300){
         guard++;
-        const l = kanaSeq.length; // sinh distractor với số âm giống nhau
-        const {kanaSeq: k2, romaSeq: r2} = genSeq(QuizState.bank, l, rngLocal);
-        const cand = needH2R ? r2 : k2;
+        const {kanaSeq:k2, romaSeq:r2} = genSeq($("#script").value, $("#includeWo").value, l, rngLocal);
+        const cand = needK2R ? r2 : k2;
         if(!optSet.has(cand)){
           options.push(cand);
           optSet.add(cand);
@@ -276,7 +279,7 @@ function generateQuiz(fromWrongList=null){
       const input = document.createElement("input");
       input.className = "fill";
       input.setAttribute("autocomplete","off");
-      input.setAttribute("placeholder", askH2R ? "Điền romaji (vd: shita)" : "Điền hiragana (vd: した)");
+      input.setAttribute("placeholder", askK2R ? "Điền romaji (vd: shita)" : "Điền kana (vd: した / シタ)");
       input.addEventListener("input", () => {
         if(!input._raf){
           input._raf = true;
@@ -298,9 +301,9 @@ function generateQuiz(fromWrongList=null){
 
     const tip = document.createElement("div");
     tip.className = "explain";
-    tip.textContent = askH2R
+    tip.textContent = askK2R
       ? "Gợi ý: đọc liền mạch chuỗi kana rồi chuyển sang romaji."
-      : "Gợi ý: chuyển từng âm romaji sang kana, rồi ghép lại.";
+      : "Gợi ý: đổi từng âm romaji sang kana rồi ghép lại (Katakana dùng cho mượn ngoại lai).";
     card.appendChild(tip);
 
     quizEl.appendChild(card);
@@ -308,15 +311,11 @@ function generateQuiz(fromWrongList=null){
 
   QuizState.total = picked.length;
   updateProgress();
-
-  // Timer
   startTimer(timeLimit);
-
-  // mở đầu trang
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
-// ===== Check & Report =====
+// ======= Check & Report =======
 function checkAnswers(auto=false){
   if(QuizState.locked && !auto) return;
 
@@ -365,8 +364,8 @@ function checkAnswers(auto=false){
 
     rowsForExport.push({
       no: idx+1,
-      mode: ask==="h2r" ? "Hira→Roma" : "Roma→Hira",
-      prompt: ask==="h2r" ? kanaSeq : romaSeq,
+      mode: ask==="k2r" ? "Kana→Roma" : "Roma→Kana",
+      prompt: ask==="k2r" ? kanaSeq : romaSeq,
       your: userAns || "(bỏ trống)",
       correct
     });
@@ -396,7 +395,6 @@ function checkAnswers(auto=false){
       <div class="item"><div class="label">% chính xác</div><div class="value">${Math.round(100*correctCount/cards.length)}%</div></div>
       <div class="item"><div class="label">Thời gian</div><div class="value">${msToClock(duration)}</div></div>
       <div class="item"><div class="label">Tốc độ TB/câu</div><div class="value">${(perQ/1000).toFixed(1)}s</div></div>
-      <div class="item"><div class="label">Streak đúng dài nhất</div><div class="value">${bestStreak}</div></div>
       <div class="item"><div class="label">Seed</div><div class="value">${QuizState.seed}</div></div>
     </div>
   `;
@@ -420,17 +418,18 @@ function checkAnswers(auto=false){
 
 function revealAll(){ document.querySelectorAll(".qcard details").forEach(d => d.open = true); }
 
-// ===== Retry wrong only =====
+// ======= Retry wrong only =======
 function retryWrong(){
   const wrongCards = [...document.querySelectorAll(".qcard.wrong, .qcard:not(.correct):not(.wrong)")];
   if(!wrongCards.length) return;
 
   const wrongItems = wrongCards.map(card => {
-    const ask = card.dataset.ask === "h2r";
+    const ask = card.dataset.ask === "k2r";
     return {
       kanaSeq: card.dataset.kanaSeq,
       romaSeq: card.dataset.romaSeq,
-      askH2R: ask
+      askK2R: ask,
+      script: $("#script").value
     };
   });
 
@@ -440,12 +439,12 @@ function retryWrong(){
   window.scrollTo({top:0, behavior:"smooth"});
 }
 
-// ===== Export TXT =====
+// ======= Export TXT =======
 function exportResult(){
   if(!QuizState.lastExport) return;
   const ex = QuizState.lastExport;
   const lines = [];
-  lines.push("== HIRAGANA QUIZ RESULT ==");
+  lines.push("== KANA QUIZ RESULT ==");
   lines.push(`Score: ${ex.score} (${ex.percent}%)`);
   lines.push(`Time: ${ex.duration} | Avg/Q: ${ex.perQ} | Best Streak: ${ex.bestStreak}`);
   lines.push(`Revealed before submit: ${ex.revealedCount}`);
@@ -467,14 +466,14 @@ function exportResult(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `hiragana-quiz-result-${Date.now()}.txt`;
+  a.download = `kana-quiz-result-${Date.now()}.txt`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
 }
 
-// ===== Bindings =====
+// ======= Bindings =======
 document.addEventListener("DOMContentLoaded", () => {
   $("#gen").addEventListener("click", () => generateQuiz());
   $("#revealAll").addEventListener("click", revealAll);
@@ -487,6 +486,6 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#retryWrong").addEventListener("click", retryWrong);
   $("#exportResult").addEventListener("click", exportResult);
 
-  // đề mặc định
+  // đề mặc định: Katakana, trộn 2 chiều
   generateQuiz();
 });
