@@ -155,15 +155,16 @@
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyBfS5Iv2DzOh6lvV1yQsF9G7rsLkSksyeQ",
-    authDomain: "learn-japan-7270d.firebaseapp.com",
-    databaseURL: "https://learn-japan-7270d-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "learn-japan-7270d",
-    storageBucket: "learn-japan-7270d.appspot.com",
-    messagingSenderId: "396837788671",
-    appId: "1:396837788671:web:75495079b66d9dfcada5ca",
-    measurementId: "G-B3XP64MWP7"
-  };
+  apiKey: "AIzaSyBfS5Iv2DzOh6lvV1yQsF9G7rsLkSksyeQ",
+  authDomain: "learn-japan-7270d.firebaseapp.com",
+  // ✅ copy đúng URL từ Firebase Console → Realtime Database → Data
+  databaseURL: "https://learn-japan-7270d-default-rtdb.firebaseio.com",
+  projectId: "learn-japan-7270d",
+  storageBucket: "learn-japan-7270d.appspot.com",
+  messagingSenderId: "396837788671",
+  appId: "1:396837788671:web:75495079b66d9dfcada5ca",
+  measurementId: "G-B3XP64MWP7"
+};
 
   const app  = initializeApp(firebaseConfig);
   const db   = getDatabase(app);
