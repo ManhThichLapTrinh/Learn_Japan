@@ -9,7 +9,7 @@
 <body>
   <div class="wrap">
     <h1>Kana Quiz <span class="neon">Demnka</span></h1>
-    <p class="lead">Luyện bảng chữ cái Nhật: <b>Hiragana</b> & <b>(v0.3 updated)Katakana</b>.</p>
+    <p class="lead">Luyện bảng chữ cái Nhật: <b>Hiragana</b> & <b>(Updated V0.3)Katakana</b>.</p>
 
     <!-- Sticky (Tiến độ + Đồng hồ) -->
     <div id="stickyBar" class="sticky">
@@ -132,15 +132,60 @@
     <!-- Kết quả -->
     <div id="result" class="panel result" style="display:none;margin-top:12px"></div>
 
+    <!-- Footer -->
     <div class="footer">
-       <span>© <span id="year">
-       Mẹo: Khi học Katakana, hãy chú ý các chữ dễ lẫn (ソ/ン, シ/ツ, フ/ウ...). 
-      </span> · Tạo bởi <strong>TuanManh</strong></span>
-      </div>
-    
+      <span>© <span id="year"></span> · Tạo bởi <strong>TuanManh</strong></span>
+    </div>
+  </div>
 
+  <!-- Floating presence (góc dưới màn hình) -->
+  <div class="presence" id="presenceBox">
+    <span class="presence-dot"></span>
+    Đang online: <b id="onlineCount">—</b>
   </div>
 
   <script src="app.js"></script>
+
+  <!-- Firebase Presence (CDN modules) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, onValue, onDisconnect, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // TODO: Dán cấu hình Firebase của bạn ở đây
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    // Tạo session cho mỗi tab
+    const sessionId = `s_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}_${Date.now()}`;
+    const sessRef = ref(db, `presence/${sessionId}`);
+
+    // Đăng ký hiện diện
+    await set(sessRef, {
+      ts: Date.now(),
+      ua: navigator.userAgent.slice(0, 120)
+    });
+
+    // Xoá khi tab đóng/mất kết nối
+    onDisconnect(sessRef).remove();
+
+    // Đếm số phiên online
+    const presenceRoot = ref(db, "presence");
+    const onlineCountEl = document.getElementById("onlineCount");
+    onValue(presenceRoot, (snap) => {
+      const val = snap.val() || {};
+      const count = Object.keys(val).length;
+      if (onlineCountEl) onlineCountEl.textContent = String(count);
+    });
+  </script>
 </body>
 </html>
